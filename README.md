@@ -40,7 +40,7 @@ These findings may conflict with EU privacy law (GDPR and the ePrivacy rules). T
   ```
 - **On the examined car:** all five entries were stored as enabled and unconfirmed.
 - **What it unlocks:** "product quality" is the switch that gates app analytics, and BMW's configuration on that car had analytics switched on.
-- **What was sent:** probably nothing on that car. Its logs show analytics events being dropped, and its crowd-data jobs ran 1,185 times and produced no events.
+- **What was sent:** probably nothing on that car. Its logs show analytics events being dropped, and its crowd-data jobs ran 1,185 times and produced no events. (Just because the SIM in the examined car cant roam in country its in currently)
 - **Why it matters:** consent under GDPR must be an active opt-in. The EU Court of Justice held that a pre-ticked box is not valid consent (Planet49, C-673/17).
 
 ### 2. Campaign jobs ignore the privacy menu
