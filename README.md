@@ -43,7 +43,27 @@ These findings may conflict with EU privacy law (GDPR and the ePrivacy rules). T
 - **What was sent:** probably nothing on that car. Its logs show analytics events being dropped, and its crowd-data jobs ran 1,185 times and produced no events.
 - **Why it matters:** consent under GDPR must be an active opt-in. The EU Court of Justice held that a pre-ticked box is not valid consent (Planet49, C-673/17).
 
-### 2. Location access switched back on
+### 2. Campaign jobs ignore the privacy menu
+
+*Confirmed in the code and in the jobs found on the examined car.*
+
+BMW pushes data-collection scripts ("campaign jobs") to the car. The car's privacy menu does not control what they collect:
+
+- **The native collector** (`cdc-native`) never reads the privacy settings. It is controlled only by vehicle coding, provisioning and the campaigns themselves.
+- **The crowd-data app** sends all privacy states to BMW with each job request. No code in the app blocks a job's events on those states, so any filtering happens on BMW's servers and cannot be verified from the car.
+- **The jobs themselves:** the examined car held nine jobs. None of them stops collecting based on the user's switches:
+  - A fault-code job collects diagnostic data with **GPS position and VIN** when a warning light, the check-engine light or a software update triggers it. It reads `CDC_PRODUCT_QUALITY` only to set its time-based schedule; the event triggers never check it.
+    ```
+    calculateTimeBasedInterval(){ const i=this.ctx.framework.platform.getPrivacySettings(); ... let s=i.CDC_PRODUCT_QUALITY ...
+    config: "sendGps": true, "identifierType": "VIN", "ccmTrigger_active": true, "milTrigger_active": true, "rsuTrigger_active": true
+    ```
+  - A warning-message job reads one unrelated switch (`LAST_STATE_CALL`) for a side feature.
+  - Two GPS jobs have "privacy" logic, but it only cuts positions near the start and destination of a trip (`privacyDataCollectAllowed`, `PrivacyParams`). It never reads the user's settings.
+  - The other five jobs (diagnostic read-outs, road-hazard traces, a telematics-unit reset) contain no privacy check at all.
+- **Reach:** jobs can read up to 169 interfaces, including position, journey history, diagnostics, DLT system logs and crash dumps.
+- **No account needed:** on the examined car, new jobs were delivered while it had no ConnectedDrive account.
+
+### 3. Location access switched back on
 
 *Confirmed in the code. Whether it overrides a saved "off" still needs a test on a car.*
 
@@ -54,7 +74,7 @@ These findings may conflict with EU privacy law (GDPR and the ePrivacy rules). T
 - **The drive-data app:** it treats location as allowed unless it reads exactly `UserDisabled`.
 - **Open question:** it is not clear from the code whether the forced value is written back over the user's saved choice. If it is, the user's "off" is overridden.
 
-### 3. Collection with no switch
+### 4. Collection with no switch
 
 *Confirmed in the code.* These flows have no privacy switch:
 
@@ -69,11 +89,11 @@ These findings may conflict with EU privacy law (GDPR and the ePrivacy rules). T
 
 Some of this may rest on a "legitimate interest". GDPR still requires transparency, collecting only what is needed, and privacy-friendly defaults (Article 25). Background location polling with no off switch is the hardest to justify.
 
-### 4. Tracking on by default
+### 5. Tracking on by default
 
 The per-drive record (VIN, account ID, exact start and end GPS, driving-style scores) belongs to the History setting, which is **on by default**. That conflicts with data protection by default (GDPR Article 25). On the examined car, BMW's configuration had this use case switched off.
 
-### 5. Smaller points
+### 6. Smaller points
 
 - **Drive counter:** while sending is not allowed, the drive-data app counts the drives and sends the count with the next record that is allowed.
 - **Factory reset:** crash dumps survive it, and deleted files are unlinked, not overwritten.
@@ -91,14 +111,15 @@ The per-drive record (VIN, account ID, exact start and end GPS, driving-style sc
 1. **The MGU is built to report a lot, but the BMW backend decides how much of it runs.** Almost every upload needs a signed configuration ("provisioning") pushed by BMW, and most need a working connection through the car's telematics unit. The hostnames are not in the code; BMW sends them.
 2. **With ConnectedDrive active, the default is a lot of data.** After every drive the car can send a record with the **VIN, your BMW account ID, the exact start and end GPS position**, times, distance, fuel or electric use and driving-style scores. This "History" use case is **on by default**.
 3. **The VIN goes with almost everything**, in clear text.
-4. **Some flows have no switch at all:**
+4. **BMW's data campaigns don't follow the privacy menu.** BMW pushes collection scripts to the car, and none of the ones examined stops collecting when the user's switches are off (see [Possibly unlawful practices](#possibly-unlawful-practices)).
+5. **Some flows have no switch at all:**
    - the weather app sends the exact position about every 20 minutes or 10 km
    - remote diagnosis is started by the backend
    - the software-update report
    - the crowd-data collector, which runs data-collection jobs BMW sends to the car
    - the upload of your privacy settings themselves, every 15 days at most
-5. **Voice:** the car is **not** always listening unless you turn on the wake word or "Active speech processing". Both are off by default. Wake-word detection runs on the head unit. When **online speech processing** is on, the **recorded audio of your command is sent to BMW** with the VIN and your position, destination and route.
-6. **Stored on the unit:** messages and call lists from your phone, Bluetooth pairings, about 17 MB of learned trip history, destinations and voice vocabulary. It is encrypted, but the key unlocks itself at every boot. A factory reset deletes it, except crash dumps, VIN, mileage, service history and fault memory.
+6. **Voice:** the car is **not** always listening unless you turn on the wake word or "Active speech processing". Both are off by default. Wake-word detection runs on the head unit. When **online speech processing** is on, the **recorded audio of your command is sent to BMW** with the VIN and your position, destination and route.
+7. **Stored on the unit:** messages and call lists from your phone, Bluetooth pairings, about 17 MB of learned trip history, destinations and voice vocabulary. It is encrypted, but the key unlocks itself at every boot. A factory reset deletes it, except crash dumps, VIN, mileage, service history and fault memory.
 
 **The examined car** was not signed in to ConnectedDrive, so most of these flows are dormant. Four BMW apps still start without a login (emergency/breakdown call, remote diagnosis, crowd-data collector, trigger engine). Whether they send anything depends on BMW's provisioning for that car, which could not be read.
 
